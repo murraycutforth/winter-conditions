@@ -1,0 +1,19 @@
+[Unit]
+Description=Scotland rain radar archiver (RainViewer)
+Wants=network-online.target time-sync.target
+After=network-online.target time-sync.target
+
+[Service]
+Type=simple
+User=__USER__
+WorkingDirectory=__DIR__
+ExecStart=/usr/bin/python3 -m rainarchive -c __DIR__/config.toml run
+Restart=always
+RestartSec=60
+# Be gentle on the Pi
+Nice=10
+IOSchedulingClass=idle
+MemoryMax=400M
+
+[Install]
+WantedBy=multi-user.target

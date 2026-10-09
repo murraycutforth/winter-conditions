@@ -1,0 +1,154 @@
+# rain-archive configuration. Copy to config.toml and edit.
+
+# Where the archive lives. A USB SSD is better than the SD card for years of data,
+# e.g. "/mnt/ssd/rain-archive-data". About 2-4 GB per year with raw frames kept.
+data_dir = "~/rain-archive-data"
+
+# How often to check RainViewer. Each check downloads every 10-minute frame not yet stored,
+# so the archive has no gaps as long as the Pi is never offline for more than ~2 hours.
+poll_minutes = 15
+poll_offset_seconds = 90
+
+# Delete raw 10-minute frame PNGs older than this many days (0 = keep forever).
+# Per-frame stats, site time series and daily totals are always kept.
+keep_frames_days = 0
+
+# Archive area. Snapped outwards to whole zoom-7 tiles: this box gives a 1024 x 1280 pixel grid
+# covering 11.25W-0E, 54.2N-61.7N (~650 m pixels at Scottish latitudes).
+# Don't change this once collection has started (use a new data_dir instead).
+[area]
+west = -8.7
+south = 54.6
+east = -0.6
+north = 61.0
+zoom = 7
+
+[fetch]
+min_request_interval_s = 0.8   # ~75 requests/min, under RainViewer's 100/min limit
+timeout_s = 20
+retries = 3
+
+# Points recorded every frame into the site_obs table (fast time series for dashboards).
+# You can add sites later; they start recording from that point on.
+[[sites]]
+name = "Ben Nevis"
+lat = 56.7969
+lon = -5.0036
+
+[[sites]]
+name = "Cairn Gorm"
+lat = 57.1167
+lon = -3.6444
+
+[[sites]]
+name = "Edinburgh"
+lat = 55.9533
+lon = -3.1883
+
+# ---------------------------------------------------------------------------------------------
+# Crag weather extension (python3 -m rainarchive.weather ...). Stored in data_dir/weather.sqlite.
+[weather]
+era5_start = "2000-01-01"        # ERA5 reanalysis backfill start (available back to 1940)
+ukv_start = "2022-03-01"         # Met Office UKV 2 km archive starts here
+timezone = "Europe/London"       # daily features use local calendar days
+daily_call_budget = 7000         # Open-Meteo free tier is ~10,000 weighted calls/day
+hourly_call_budget = 3500
+
+# Winter venues. lat/lon on or just below the cliffs; elev_m = mid-height of the climbing
+# (temperature is downscaled to this); aspect = direction the faces look towards (0 = north).
+# Positions checked on a map; after changing one, run: python3 -m rainarchive.weather -c config.toml refetch "<name>"
+[[crags]]
+name = "Northern Corries"
+area = "Northern Cairngorms"
+lat = 57.1040
+lon = -3.6753
+elev_m = 1050
+aspect = 340
+
+[[crags]]
+name = "Ben Nevis"
+area = "Lochaber"
+lat = 56.8010
+lon = -5.0060
+elev_m = 1150
+aspect = 20
+
+[[crags]]
+name = "Lochnagar"
+area = "Southern Cairngorms"
+lat = 56.9559
+lon = -3.2380
+elev_m = 1000
+aspect = 30
+
+[[crags]]
+name = "Creag Meagaidh"
+area = "Creag Meagaidh"
+lat = 56.9570
+lon = -4.5850
+elev_m = 950
+aspect = 60
+
+[[crags]]
+name = "Beinn Eighe"
+area = "Torridon"
+lat = 57.5852
+lon = -5.4307
+elev_m = 850
+aspect = 320
+
+[[crags]]
+name = "Beinn Bhan"
+area = "Torridon"
+lat = 57.4480
+lon = -5.6655
+elev_m = 700
+aspect = 75
+
+[[crags]]
+name = "Shelter Stone Crag"
+area = "Northern Cairngorms"
+lat = 57.0922
+lon = -3.6502
+elev_m = 900
+aspect = 45
+
+[[crags]]
+name = "Church Door Buttress"
+area = "Glencoe"
+lat = 56.6455
+lon = -5.0290
+elev_m = 1050
+aspect = 0
+
+[[crags]]
+name = "Stob Coire nan Lochan"
+area = "Glencoe"
+lat = 56.6515
+lon = -5.0130
+elev_m = 1000
+aspect = 45
+
+[[crags]]
+name = "Beinn Dorain"
+area = "Southern Highlands"
+lat = 56.5030
+lon = -4.7250
+elev_m = 850
+aspect = 290
+
+[[crags]]
+name = "Beinn a' Bhuird"
+area = "Southern Cairngorms"
+lat = 57.0950
+lon = -3.4729
+elev_m = 1000
+aspect = 20
+
+[[crags]]
+name = "A' Mhaighdean"
+area = "Fisherfield"
+lat = 57.7195
+lon = -5.3475
+elev_m = 850
+aspect = 315

@@ -1,0 +1,15 @@
+# local data and machine-specific config (the Pi's config.toml must never be overwritten by a deploy)
+local-data/
+local.toml
+config.toml
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# OS / editor
+.DS_Store

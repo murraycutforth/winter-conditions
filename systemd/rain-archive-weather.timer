@@ -1,0 +1,11 @@
+[Unit]
+Description=Run the crag weather update every 3 hours
+
+[Timer]
+OnBootSec=5min
+OnCalendar=*-*-* 00/3:17:00
+RandomizedDelaySec=300
+Persistent=true
+
+[Install]
+WantedBy=timers.target

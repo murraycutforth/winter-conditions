@@ -1,0 +1,20 @@
+[Unit]
+Description=Crag conditions dashboard (read-only web UI on port 8080)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=__USER__
+WorkingDirectory=__DIR__
+ExecStart=/usr/bin/python3 -m rainarchive.dashboard -c __DIR__/config.toml --port 8080
+Restart=always
+RestartSec=10
+# Be gentle on the Pi: the collector and the weather timer come first
+Nice=10
+IOSchedulingClass=idle
+# the radar cache holds ~110 MB of hourly totals
+MemoryMax=400M
+
+[Install]
+WantedBy=multi-user.target

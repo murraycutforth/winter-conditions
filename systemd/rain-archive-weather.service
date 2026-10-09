@@ -1,0 +1,13 @@
+[Unit]
+Description=Crag weather archive update (Open-Meteo) and conditions features
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=__USER__
+WorkingDirectory=__DIR__
+ExecStart=/usr/bin/python3 -m rainarchive.weather -c __DIR__/config.toml update
+Nice=10
+IOSchedulingClass=idle
+TimeoutStartSec=3h
