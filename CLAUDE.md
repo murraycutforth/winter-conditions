@@ -23,6 +23,8 @@ pip install numpy pillow requests
 python3 -m tests.test_offline
 python3 -m tests.test_weather_offline
 python3 -m tests.test_dashboard_offline
+python3 -m tests.test_sais_offline
+python3 -m tests.test_ruuvi_offline
 
 # local run (radar collector)
 python3 -m rainarchive -c local.toml {run|once|status|build-daily [--date D|--all]|render [--latest|--time T|--daily D] -o out.png}
@@ -33,6 +35,13 @@ python3 -m rainarchive.weather -c local.toml status
 python3 -m rainarchive.weather -c local.toml show "Ben Nevis" --days 21
 python3 -m rainarchive.weather -c local.toml features --all
 python3 -m rainarchive.weather -c local.toml refetch "<crag name>"
+
+# research: SAIS avalanche labels + baseline (log in research/SAIS_LOG.md; Mac only, needs scipy + sklearn)
+python3 -m rainarchive.sais -c local.toml {calendar [--season Y]|status}
+python3 research/sais_baseline.py
+
+# RuuviTag (on the Pi: needs Bluetooth + apt python3-bleak; hourly timer rain-archive-ruuvi)
+python3 -m rainarchive.ruuvi -c config.toml {sync|status|show [--hours 24]}
 
 # local run (dashboard, then open http://localhost:8080/)
 python3 -m rainarchive.dashboard -c local.toml --port 8080

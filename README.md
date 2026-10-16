@@ -46,6 +46,7 @@ Pi access: `ssh murray@pi4.local` (SSH key auth from the Mac works; sudo needs a
 | 10 m → ridge-wind fallback (`calibrate_wind` / `crag_calib`) | **Implemented 2026-10-09** (re-done: the earlier version had been lost) and **running on the Pi**; all features fully recomputed. | Offline test (fake 850/10 m ratio 1.8 recovered exactly; a >5% factor change forces a full recompute). Real factors: ukv ×1.63–2.27, era5 ×2.75–3.91 (ERA5's ~25 km terrain is lower and smoother, so its 10 m wind is lighter). fc has too little overlap and uses the 1.6 default, but always has 850 hPa anyway. Ben Nevis Feb 2024 (10 m only): mean ridge wind 8.7 → 16.2 m/s, lee loading 114 → 177 mm, rime-face 18 → 23 h. Feb 2025 (has 850 hPa) unchanged. Calibration adds ~10 s per 3-hourly run; a full recompute takes ~4 min. Pre-change DB backup: `~/weather-backup-2026-10-09.sqlite` on the Pi (326 MB, delete once happy). |
 | Crag coordinates | **Checked by the user** on 2026-09-26 with `web/crag-check.html`, and now the defaults in `crags.py` and `config.example.toml`. | — |
 | Crag dashboard (`rainarchive/dashboard.py`, `web/dashboard/`) | **Running on the Pi** since 2026-10-09 as systemd service `rain-archive-dashboard`, `http://pi4.local:8080/` on the LAN; Tailscale installed on the Pi for phone access away from home | Offline test (`tests.test_dashboard_offline`) on the Mac and the Pi; endpoints checked against real data (board 38 KB / 75 ms, crag 35 KB / 30 ms, status 2 s uncached); views screenshotted at phone width. Minimal phase-2 version: board, crag view (temperature, ridge wind in mph + arrows, precipitation vs radar, SWE/loading, rime since last thaw), radar page (live frames + 1 h–7 day accumulation), status. Radar cache: ~80 s warm-up after a restart, then 183 MB RSS. The Pi kernel has `cgroup_disable=memory`, so systemd `MemoryMax` caps are **not enforced** for any service. |
+| RuuviTag logger (`rainarchive/ruuvi.py`) | **Running on the Pi** since 2026-10-16: systemd timer `rain-archive-ruuvi` (hourly) | Tag 9261 (`F6:88:CF:86:92:61`, RuuviTag B, FW 3.31.1). First real sync downloaded the full on-tag history (278 × 5-min T/RH/p records from 2026-10-15 21:48 UTC) in 69 s; hourly runs fetch only new records. Offline test `tests.test_ruuvi_offline`. Bluetooth had to be unblocked (`rfkill`); `python3-bleak` installed from apt. |
 | UK radar web viewer (`web/uk-rain-radar.html`) | **Working with live data** in the user's browser. **Not in the project folder on 2026-10-09** (a copy is in `~/Downloads`; `crag-check.html` wasn't found). | Background map switched from CARTO (now needs an API key) to Esri. Accumulation works UK-wide after adding request rate limiting. |
 
 ### Immediate open items
@@ -85,15 +86,20 @@ Roughly in priority order. Each item says what "done" looks like.
    Done when: a table of model-minus-observed temperature/RH/wind by month exists.
    Planned in detail in [`DASHBOARD_PLAN.md`](DASHBOARD_PLAN.md) §2.5, along with Holfuy stations. Found on
    2026-09-28: the AWS CSV wind is in m/s; 2024 to ~2025-09 is a fault period; the live feed stopped on 2026-08-31.
-3. **Field logger importer**, once the user picks a device. The recommendation was a
-   **Kestrel DROP D3** (temperature/RH/pressure, CSV export) plus a phone GPX track. The alternative
-   was a Garmin watch + tempe (FIT files; no RH).
-   - New command `python3 -m rainarchive.weather import <files>`.
-   - Time-join the logger with GPS, tag each reading with the nearest crag within 1 km, and store it in a new `field_obs` table.
-   - Add a view comparing it with `wx_hourly` for the same hour.
-4. **Scottish Avalanche Information Service (SAIS) reports** as labels/context. Store the daily
-   reports for the six areas (Lochaber, Glencoe, Creag Meagaidh, N/S Cairngorms, Torridon). Check
-   the site structure and terms first; keep a raw copy.
+3. **Field logger: RuuviTag + Coros watch GPS.** The user bought a RuuviTag (T/RH/p, logs every
+   5 min on the tag, ~10 days). It lives at home and is sometimes carried up hills; the Pi checks
+   for it hourly and back-fills the tag's log when it returns (done 2026-10-16, see §1 and
+   `ruuvi.sqlite`). **Next:** import GPS tracks from the user's Coros watch, time-join them with
+   `ruuvi_history` to tag readings with position/altitude and the nearest crag, flag "at home" vs
+   "on the hill", and compare with `wx_hourly` for the same hour and height.
+   - Coros exports FIT/GPX; check the format (and whether it records barometric altitude) first.
+   - Tag readings with the nearest crag within 1 km and store the joined result (e.g. a
+     `field_obs` table), then add a view comparing it with `wx_hourly` for the same hour.
+   - The tag sits in a pocket or pack: expect body-heat bias unless it is carried outside.
+4. **Scottish Avalanche Information Service (SAIS) reports**, now a research thread with its own
+   log: [`research/SAIS_LOG.md`](research/SAIS_LOG.md). The headline hazard calendars for 2007–2026
+   are scraped (`rainarchive/sais.py`), and a first weather → hazard baseline exists. Full reports
+   (observed hazard, problems, aspect rose, recorded avalanches) are next.
 5. **Dashboard.** Plan: [`DASHBOARD_PLAN.md`](DASHBOARD_PLAN.md). A minimal phase-2 version is live
    (§7, Dashboard). Next: freezing level / profile panels once phase 1a adds those variables, station
    overlays after phase 1b, then the phase-3 views (aspect rose, season context, conditions flags).
@@ -118,11 +124,14 @@ rain-archive/
 ├── install.sh                   Pi install for the radar collector (apt deps, self-test, live poll, systemd)
 ├── install-weather.sh           Pi install for the weather timer (self-test, systemd timer, first run)
 ├── install-dashboard.sh         Pi install for the dashboard service (self-test, systemd, port 8080)
+├── install-ruuvi.sh             Pi install for the hourly RuuviTag check (bleak, rfkill, systemd timer)
 ├── systemd/
 │   ├── rain-archive.service             always-on radar collector (Restart=always)
 │   ├── rain-archive-weather.service     oneshot weather update
 │   ├── rain-archive-weather.timer       every 3 h (00/3:17 + random delay), Persistent=true
-│   └── rain-archive-dashboard.service   always-on read-only web dashboard (port 8080)
+│   ├── rain-archive-dashboard.service   always-on read-only web dashboard (port 8080)
+│   ├── rain-archive-ruuvi.service       oneshot RuuviTag check (scan, broadcast sample, history download)
+│   └── rain-archive-ruuvi.timer         hourly (+ up to 2 min random delay), Persistent=true
 ├── rainarchive/
 │   ├── __main__.py      radar CLI: run | once | status | build-daily | render
 │   ├── config.py        radar config (TOML); grid bbox; sites
@@ -136,12 +145,20 @@ rain-archive/
 │   ├── openmeteo.py     Open-Meteo client: ukv / era5 / fc sources, call weighting, pacing
 │   ├── features.py      daily conditions features (pure Python; thresholds at the top)
 │   ├── render.py        radar grid → RGBA images (frame colours, accumulation scale)
+│   ├── ruuvi.py         RuuviTag over Bluetooth: broadcast decode, on-tag log download → ruuvi.sqlite
+│   ├── sais.py          SAIS forecast-archive scraper → sais.sqlite (research labels)
 │   ├── weather.py       weather.sqlite schema, budgeted backfill, wind calibration, features, CLI
 │   └── dashboard.py     stdlib HTTP server: JSON API + static page, read-only, cached per data update
 ├── tests/
 │   ├── test_offline.py          radar pipeline against a fake RainViewer
 │   ├── test_weather_offline.py  features + weather pipeline against a fake Open-Meteo
-│   └── test_dashboard_offline.py  dashboard API/static serving against a fake-built weather.sqlite
+│   ├── test_dashboard_offline.py  dashboard API/static serving against a fake-built weather.sqlite
+│   ├── test_sais_offline.py       SAIS calendar scraper against a fake sais.gov.uk
+│   └── test_ruuvi_offline.py      RuuviTag decode + download/resume against a fake Bluetooth backend
+├── research/
+│   ├── SAIS_LOG.md              research log: predicting SAIS hazard from weather (+ radar)
+│   ├── sais_baseline.py         baseline models (Mac only: scipy + scikit-learn)
+│   └── results/                 generated result tables
 └── web/
     ├── dashboard/               index.html, app.js, app.css, vendor/ uPlot 1.6.32 + Leaflet 1.9.4 (vendored)
     ├── uk-rain-radar.html       live UK radar viewer (Leaflet, RainViewer; loop + accumulation)
